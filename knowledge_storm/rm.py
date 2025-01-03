@@ -558,6 +558,7 @@ class SerperRM(dspy.Retrieve):
 
         return collected_results
 
+import urllib.parse
 
 class BraveRM(dspy.Retrieve):
     def __init__(
@@ -612,21 +613,28 @@ class BraveRM(dspy.Retrieve):
                     "Accept-Encoding": "gzip",
                     "X-Subscription-Token": self.brave_search_api_key,
                 }
+                logging.info(f"Searching Brave for query: {query}")
+                encoded_query = urllib.parse.quote(query)
                 response = requests.get(
-                    f"https://api.search.brave.com/res/v1/web/search?result_filter=web&q={query}",
+                    f"https://api.search.brave.com/res/v1/web/search?result_filter=web&q={encoded_query}",
                     headers=headers,
-                ).json()
-                results = response.get("web", {}).get("results", [])
+                    timeout=10
+                )
+                response.raise_for_status()
+                data = response.json()
+                results = data.get("web", {}).get("results", [])
+                logging.info(f"Got {len(results)} results from Brave")
 
                 for result in results:
-                    collected_results.append(
-                        {
-                            "snippets": result.get("extra_snippets", []),
+                    if self.is_valid_source(result.get("url")) and result.get("url") not in exclude_urls:
+                        logging.debug(f"Processing result: {result.get('url')}")
+                        result_data = {
+                            "snippets": [result.get("description", "")] + result.get("extra_snippets", []),
                             "title": result.get("title"),
                             "url": result.get("url"),
-                            "description": result.get("description"),
+                            "description": result.get("description", ""),
                         }
-                    )
+                        collected_results.append(result_data)
             except Exception as e:
                 logging.error(f"Error occurs when searching query {query}: {e}")
 
@@ -786,10 +794,16 @@ class DuckDuckGoSearchRM(dspy.Retrieve):
         giveup=giveup_hdlr,
     )
     def request(self, query: str):
-        results = self.ddgs.text(
-            query, max_results=self.k, backend=self.duck_duck_go_backend
-        )
-        return results
+        if not query or not query.strip():
+            return []
+        try:
+            results = self.ddgs.text(
+                query.strip(), max_results=self.k, backend=self.duck_duck_go_backend
+            )
+            return results
+        except AssertionError:
+            # Handle the case where keywords are empty
+            return []
 
     def forward(
         self, query_or_queries: Union[str, List[str]], exclude_urls: List[str] = []

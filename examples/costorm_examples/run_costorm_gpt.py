@@ -32,7 +32,7 @@ def main(args):
         "api_provider": "openai",
         "temperature": 1.0,
         "top_p": 0.9,
-        "api_base": None,
+        "api_base": os.getenv("OPENAI_API_BASE"),
     } if os.getenv('OPENAI_API_TYPE') == 'openai' else {
         "api_key": os.getenv("AZURE_API_KEY"),
         "temperature": 1.0,
@@ -69,7 +69,7 @@ def main(args):
     lm_config.set_question_asking_lm(question_asking_lm)
     lm_config.set_knowledge_base_lm(knowledge_base_lm)
 
-    topic = input('Topic: ')
+    topic = args.topic
     runner_argument = RunnerArgument(
         topic=topic,
         retrieve_top_k=args.retrieve_top_k,
@@ -155,7 +155,8 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = ArgumentParser()
+    parser = ArgumentParser(description='STORM Wiki pipeline powered by GPT-3.5/4 and various search engines.')
+    parser.add_argument('topic', type=str, help='Topic to research and generate article about')
     # global arguments
     parser.add_argument('--output-dir', type=str, default='./results/co-storm',
                         help='Directory to store the outputs.')

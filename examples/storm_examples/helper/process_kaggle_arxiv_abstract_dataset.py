@@ -8,7 +8,8 @@ from argparse import ArgumentParser
 import pandas as pd
 
 if __name__ == "__main__":
-    parser = ArgumentParser()
+    parser = ArgumentParser(description='STORM Wiki pipeline powered by GPT-3.5/4 and various search engines.')
+    parser.add_argument('topic', type=str, help='Topic to research and generate article about')
     parser.add_argument("--input-path", type=str, help="Path to arxiv_data_210930-054931.csv.")
     parser.add_argument("--output-path", type=str,
                         help="Path to store the csv file that is compatible with VectorRM.")

@@ -96,7 +96,8 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser()
+    parser = ArgumentParser(description='STORM Wiki pipeline powered by GPT-3.5/4 and various search engines.')
+    parser.add_argument('topic', type=str, help='Topic to research and generate article about')
     # global arguments
     parser.add_argument(
         "--output-dir",

@@ -26,7 +26,24 @@ from knowledge_storm import STORMWikiRunnerArguments, STORMWikiRunner, STORMWiki
 from knowledge_storm.lm import DeepSeekModel
 from knowledge_storm.rm import YouRM, BingSearch, BraveRM, SerperRM, DuckDuckGoSearchRM, TavilySearchRM, SearXNG
 from knowledge_storm.utils import load_api_key
-
+from knowledge_storm.storm_wiki.modules.callback import BaseCallbackHandler
+class ConsoleCallbackHandler(BaseCallbackHandler):
+    def on_identify_perspective_start(self, **kwargs):
+        print("on_identify_perspective_start", kwargs)
+    def on_identify_perspective_end(self, perspectives: list[str], **kwargs):
+        print("on_identify_perspective_end", perspectives)
+    def on_information_gathering_start(self, **kwargs):
+        print("on_information_gathering_start", kwargs)
+    def on_dialogue_turn_end(self, dlg_turn, **kwargs):
+        print("on_dialogue_turn_end", dlg_turn.log())
+    def on_information_gathering_end(self, **kwargs):
+        print("on_information_gathering_end", kwargs)
+    def on_information_organization_start(self, **kwargs):
+        print("on_information_organization_start", kwargs)
+    def on_direct_outline_generation_end(self, outline: str, **kwargs):
+        print("on_direct_outline_generation_end", outline)
+    def on_outline_refinement_end(self, outline: str, **kwargs):
+        print("on_outline_refinement_end", outline)
 
 def sanitize_topic(topic):
     """
@@ -107,7 +124,7 @@ def main(args):
 
     runner = STORMWikiRunner(engine_args, lm_configs, rm)
 
-    topic = input('Topic: ')
+    topic = args.topic
     sanitized_topic = sanitize_topic(topic)
 
     try:
@@ -127,7 +144,8 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = ArgumentParser()
+    parser = ArgumentParser(description='STORM Wiki pipeline powered by GPT-3.5/4 and various search engines.')
+    parser.add_argument('topic', type=str, help='Topic to research and generate article about')
     # global arguments
     parser.add_argument('--output-dir', type=str, default='./results/deepseek',
                         help='Directory to store the outputs.')

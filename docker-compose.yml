@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  storm:
+    build:
+      context: .
+      dockerfile: Dockerfile.conda
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    env_file:
+      - .env

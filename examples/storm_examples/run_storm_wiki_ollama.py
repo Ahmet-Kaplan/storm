@@ -136,7 +136,7 @@ def main(args):
     )
     runner.storm_article_generation.section_gen.write_section.demos = [write_section_example]
 
-    topic = input('Topic: ')
+    topic = args.topic
     runner.run(
         topic=topic,
         do_research=args.do_research,
@@ -149,7 +149,8 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = ArgumentParser()
+    parser = ArgumentParser(description='STORM Wiki pipeline powered by GPT-3.5/4 and various search engines.')
+    parser.add_argument('topic', type=str, help='Topic to research and generate article about')
     # global arguments
     parser.add_argument('--url', type=str, default='http://localhost',
                         help='URL of the Ollama server.')

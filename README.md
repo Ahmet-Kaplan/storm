@@ -133,7 +133,7 @@ runner = STORMWikiRunner(engine_args, lm_configs, rm)
 
 The `STORMWikiRunner` instance can be evoked with the simple `run` method:
 ```python
-topic = input('Topic: ')
+topic = args.topic
 runner.run(
     topic=topic,
     do_research=True,
@@ -183,7 +183,7 @@ lm_config.set_question_asking_lm(question_asking_lm)
 lm_config.set_knowledge_base_lm(knowledge_base_lm)
 
 # Check out the Co-STORM's RunnerArguments class for more configurations.
-topic = input('Topic: ')
+topic = args.topic
 runner_argument = RunnerArgument(topic=topic, ...)
 logging_wrapper = LoggingWrapper(lm_config)
 bing_rm = BingSearch(bing_search_api_key=os.environ.get("BING_SEARCH_API_KEY"),
@@ -264,6 +264,61 @@ python examples/costorm_examples/run_costorm_gpt.py \
     --retriever bing
 ```
 
+### Software and Systems Architecture Research
+The STORM knowledge curation engine can be extended to specialize in software and systems architecture research. Here is an example of using OpenAI models and You.com search engine.
+```python
+import os
+from knowledge_storm import STORMWikiRunnerArguments, STORMWikiRunner, STORMWikiLMConfigs
+from knowledge_storm.lm import OpenAIModel
+from knowledge_storm.rm import YouRM
+from knowledge_storm.storm_wiki.modules.software_architecture_research import SoftwareArchitectureResearchModule
+
+lm_configs = STORMWikiLMConfigs()
+openai_kwargs = {
+    'api_key': os.getenv("OPENAI_API_KEY"),
+    'temperature': 1.0,
+    'top_p': 0.9,
+}
+gpt_35 = OpenAIModel(model='gpt-3.5-turbo', max_tokens=500, **openai_kwargs)
+gpt_4 = OpenAIModel(model='gpt-4o', max_tokens=3000, **openai_kwargs)
+lm_configs.set_conv_simulator_lm(gpt_35)
+lm_configs.set_question_asker_lm(gpt_35)
+lm_configs.set_outline_gen_lm(gpt_4)
+lm_configs.set_article_gen_lm(gpt_4)
+lm_configs.set_article_polish_lm(gpt_4)
+engine_args = STORMWikiRunnerArguments(...)
+rm = YouRM(ydc_api_key=os.getenv('YDC_API_KEY'), k=engine_args.search_top_k)
+research_module = SoftwareArchitectureResearchModule(article_gen_lm=gpt_4, retrieve_top_k=engine_args.retrieve_top_k, max_thread_num=engine_args.max_thread_num)
+runner = STORMWikiRunner(engine_args, lm_configs, rm)
+runner.storm_article_generation = research_module
+```
+The `STORMWikiRunner` instance can be evoked with the simple `run` method:
+```python
+topic = input('Topic: ')
+runner.run(
+    topic=topic,
+    do_research=True,
+    do_generate_outline=True,
+    do_generate_article=True,
+    do_polish_article=True,
+)
+runner.post_run()
+runner.summary()
+```
+
+### Software and Systems Architecture Research examples
+To run the STORM Wiki pipeline with a focus on software and systems architecture research:
+1. Add `OPENAI_API_KEY="xxx"` and `YDC_API_KEY="xxx"` to `secrets.toml`
+2. Run the following command
+```bash
+python examples/storm_examples/run_storm_wiki_software_architecture.py \
+    --output-dir $OUTPUT_DIR \
+    --retriever you \
+    --do-research \
+    --do-generate-outline \
+    --do-generate-article \
+    --do-polish-article
+```
 
 ## Customization of the Pipeline
 
