@@ -466,6 +466,10 @@ def _display_persona_conversations(conversation_log):
 def _display_main_article(selected_article_file_path_dict, show_reference=True, show_conversation=True):
     article_data = DemoFileIOHelper.assemble_article_data(selected_article_file_path_dict)
 
+    if article_data is None:
+        st.error("Failed to load article data.")
+        return
+    
     with st.container(height=1000, border=True):
         table_content_sidebar = st.sidebar.expander("**Table of contents**", expanded=True)
         _display_main_article_text(article_text=article_data.get("article", ""),
@@ -520,8 +524,8 @@ def set_storm_runner():
 
     # configure STORM runner
     llm_configs = STORMWikiLMConfigs()
-    llm_configs.init_openai_model(openai_api_key=openai_api_key , openai_type='openai')
-    llm_configs.set_question_asker_lm(OpenAIModel(model='gpt-4-1106-preview', api_key=openai_api_key,
+    llm_configs.init_openai_model(openai_api_key=st.secrets['OPENAI_API_KEY'], openai_type='openai',azure_api_key=None)
+    llm_configs.set_question_asker_lm(OpenAIModel(model='gpt-4o', api_key=st.secrets['OPENAI_API_KEY'],
                                                   api_provider='openai',
                                                   max_tokens=500, temperature=1.0, top_p=0.9))
     engine_args = STORMWikiRunnerArguments(

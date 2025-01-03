@@ -150,9 +150,21 @@ class AskQuestionWithPersona(dspy.Signature):
     conv = dspy.InputField(prefix="Conversation history:\n", format=str)
     question = dspy.OutputField(format=str)
 
+class Dispatcher(dspy.Signature):
+    """You are given a question that you want to answer. You have the following information retrieval systems at your disposal.
+        If you think the question can be answered using some specific retrieval systems, choose those systems and only reply in the following format:
+        - system_name 1
+        - system_name 2
+        ...
+        - system_name n"""
+
+    topic = dspy.InputField(prefix='Topic you are discussing about: ', format=str)
+    question = dspy.InputField(prefix='Question you want to answer: ', format=str)
+    retrieval_systems = dspy.InputField(prefix='Retrieval systems names you can use along with their descriptions: ', format=str)
+    chosen_systems = dspy.OutputField(format=str)
 
 class QuestionToQuery(dspy.Signature):
-    """You want to answer the question using Google search. What do you type in the search box?
+    """You want to answer the question using this retrieval system. What do you type in the search box?
     Write the queries you will use in the following format:
     - query 1
     - query 2
@@ -161,6 +173,7 @@ class QuestionToQuery(dspy.Signature):
 
     topic = dspy.InputField(prefix="Topic you are discussing about: ", format=str)
     question = dspy.InputField(prefix="Question you want to answer: ", format=str)
+    retrieval_system = dspy.InputField(prefix='Retrieval system you are using: ', format=str)
     queries = dspy.OutputField(format=str)
 
 
@@ -173,7 +186,7 @@ class AnswerQuestion(dspy.Signature):
     conv = dspy.InputField(prefix="Question:\n", format=str)
     info = dspy.InputField(prefix="Gathered information:\n", format=str)
     answer = dspy.OutputField(
-        prefix="Now give your response. (Try to use as many different sources as possible and add do not hallucinate.)\n",
+        prefix="Now give your response. (Try to use as many different sources as possible and do not hallucinate.)\n",
         format=str,
     )
 
@@ -203,15 +216,24 @@ class TopicExpert(dspy.Module):
 
     def forward(self, topic: str, question: str, ground_truth_url: str):
         with dspy.settings.context(lm=self.engine, show_guidelines=False):
-            # Identify: Break down question into queries.
-            queries = self.generate_queries(topic=topic, question=question).queries
-            queries = [
-                q.replace("-", "").strip().strip('"').strip('"').strip()
-                for q in queries.split("\n")
-            ]
-            queries = queries[: self.max_search_queries]
+            # Identify the system to use
+            systems_with_descriptions = {nickname: f"-{nickname}: {description}" for nickname, description in self.retriever.get_nicknames_and_descriptions()}
+            if len(systems_with_descriptions) == 1:
+                # if there is only one system, use it directly, do not waste time asking the dispatcher
+                chosen_systems = list(systems_with_descriptions.keys())
+            else:
+                chosen_systems = self.dispatcher(topic=topic, question=question, retrieval_systems='\n\n'.join(systems_with_descriptions.values())).chosen_systems
+                chosen_systems = [s.replace('-', '').strip().strip('"').strip('"').strip().lower() for s in chosen_systems.split('\n')]
+            total_queries = []
+            # identify queries for each system
+            for system in chosen_systems:
+                # Identify: Break down question into queries.
+                queries = self.generate_queries(topic=topic, question=question, retrieval_system=systems_with_descriptions[system]).queries
+                queries = [q.replace('-', '').strip().strip('"').strip('"').strip() for q in queries.split('\n')]
+                queries = queries[:self.max_search_queries]
+                total_queries.append((list(set(queries)), system))
             # Search
-            searched_results: List[Information] = self.retriever.retrieve(
+            searched_results: List[Information] = self.retriever.retrieve(total_queries,
                 list(set(queries)), exclude_urls=[ground_truth_url]
             )
             if len(searched_results) > 0:
@@ -238,10 +260,9 @@ class TopicExpert(dspy.Module):
             else:
                 # When no information is found, the expert shouldn't hallucinate.
                 answer = "Sorry, I cannot find information for this question. Please ask another question."
-
-        return dspy.Prediction(
-            queries=queries, searched_results=searched_results, answer=answer
-        )
+            
+        total_queries = [query for queries, _ in total_queries for query in queries]
+        return dspy.Prediction(queries=total_queries, searched_results=searched_results, answer=answer)
 
 
 class StormKnowledgeCurationModule(KnowledgeCurationModule):

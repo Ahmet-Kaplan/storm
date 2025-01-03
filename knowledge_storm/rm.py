@@ -15,7 +15,17 @@ from .utils import WebPageHelper
 
 
 class YouRM(dspy.Retrieve):
-    def __init__(self, ydc_api_key=None, k=3, is_valid_source: Callable = None):
+    
+    def __init__(self, ydc_api_key=None, k=3, is_valid_source: Callable = None, nickname="YouRM",
+                 description="Retrieve information from You.com search."):
+        """
+        Params:
+            ydc_api_key: You.com API key.
+            k: Number of top chunks to retrieve.
+            is_valid_source: A function that takes a URL and returns a boolean.
+            nickname: Nickname of the retriever.
+            description: Description of the retriever and what it does.
+        """
         super().__init__(k=k)
         if not ydc_api_key and not os.environ.get("YDC_API_KEY"):
             raise RuntimeError(
@@ -26,6 +36,8 @@ class YouRM(dspy.Retrieve):
         else:
             self.ydc_api_key = os.environ["YDC_API_KEY"]
         self.usage = 0
+        self.nickname = nickname
+        self.description = description
 
         # If not None, is_valid_source shall be a function that takes a URL and returns a boolean.
         if is_valid_source:
@@ -87,6 +99,7 @@ class BingSearch(dspy.Retrieve):
         min_char_count: int = 150,
         snippet_chunk_size: int = 1000,
         webpage_helper_max_threads=10,
+        nickname="BingSearch", description="Retrieve information from Bing search.",
         mkt="en-US",
         language="en",
         **kwargs,
@@ -96,6 +109,8 @@ class BingSearch(dspy.Retrieve):
             min_char_count: Minimum character count for the article to be considered valid.
             snippet_chunk_size: Maximum character count for each snippet.
             webpage_helper_max_threads: Maximum number of threads to use for webpage helper.
+            nickname: Nickname of the retriever.
+            description: Description of the retriever and what it does.
             mkt, language, **kwargs: Bing search API parameters.
             - Reference: https://learn.microsoft.com/en-us/bing/search-apis/bing-web-search/reference/query-parameters
         """
@@ -116,6 +131,8 @@ class BingSearch(dspy.Retrieve):
             max_thread_num=webpage_helper_max_threads,
         )
         self.usage = 0
+        self.nickname = nickname
+        self.description = description
 
         # If not None, is_valid_source shall be a function that takes a URL and returns a boolean.
         if is_valid_source:
@@ -196,6 +213,8 @@ class VectorRM(dspy.Retrieve):
         self,
         collection_name: str,
         embedding_model: str,
+        nickname: str = "VectorRM",
+        description: str = "Retrieve information from custom documents using Qdrant.",
         device: str = "mps",
         k: int = 3,
     ):
@@ -203,11 +222,15 @@ class VectorRM(dspy.Retrieve):
         Params:
             collection_name: Name of the Qdrant collection.
             embedding_model: Name of the Hugging Face embedding model.
+            nickname: Nickname of the retriever.
+            description: Description of the retriever and what it does.
             device: Device to run the embeddings model on, can be "mps", "cuda", "cpu".
             k: Number of top chunks to retrieve.
         """
         super().__init__(k=k)
         self.usage = 0
+        self.nickname = nickname
+        self.description = description
         # check if the collection is provided
         if not collection_name:
             raise ValueError("Please provide a collection name.")
@@ -400,6 +423,8 @@ class SerperRM(dspy.Retrieve):
         self,
         serper_search_api_key=None,
         k=3,
+        nickname: str = "SerperRM",
+        description: str = "Retrieve information from custom queries using Serper.dev."
         query_params=None,
         ENABLE_EXTRA_SNIPPET_EXTRACTION=False,
         min_char_count: int = 150,
@@ -408,6 +433,8 @@ class SerperRM(dspy.Retrieve):
     ):
         """Args:
         serper_search_api_key str: API key to run serper, can be found by creating an account on https://serper.dev/
+        nickname: Nickname of the retriever.
+        description: Description of the retriever and what it does.
         query_params (dict or list of dict): parameters in dictionary or list of dictionaries that has a max size of 100 that will be used to query.
             Commonly used fields are as follows (see more information in https://serper.dev/playground):
                 q str: query that will be used with google search
@@ -452,6 +479,8 @@ class SerperRM(dspy.Retrieve):
             self.serper_search_api_key = os.environ["SERPER_API_KEY"]
 
         self.base_url = "https://google.serper.dev"
+        self.nickname = nickname
+        self.description = description
 
     def serper_runner(self, query_params):
         self.search_url = f"{self.base_url}/search"
@@ -561,9 +590,9 @@ class SerperRM(dspy.Retrieve):
 import urllib.parse
 
 class BraveRM(dspy.Retrieve):
-    def __init__(
-        self, brave_search_api_key=None, k=3, is_valid_source: Callable = None
-    ):
+    def __init__(self, brave_search_api_key=None, k=3, is_valid_source: Callable = None, nickname="BraveRM",
+                 description="Retrieve information from Brave search."):
+        
         super().__init__(k=k)
         if not brave_search_api_key and not os.environ.get("BRAVE_API_KEY"):
             raise RuntimeError(
@@ -580,6 +609,8 @@ class BraveRM(dspy.Retrieve):
             self.is_valid_source = is_valid_source
         else:
             self.is_valid_source = lambda x: True
+        self.nickname = nickname
+        self.description = description
 
     def get_usage_and_reset(self):
         usage = self.usage
@@ -648,6 +679,8 @@ class SearXNG(dspy.Retrieve):
         searxng_api_key=None,
         k=3,
         is_valid_source: Callable = None,
+        nickname="SearXNG",
+        description="Retrieve information from SearXNG search."
     ):
         """Initialize the SearXNG search retriever.
         Please set up SearXNG according to https://docs.searxng.org/index.html.
@@ -658,6 +691,8 @@ class SearXNG(dspy.Retrieve):
             k (int, optional): The number of top passages to retrieve. Defaults to 3.
             is_valid_source (Callable, optional): A function that takes a URL and returns a boolean indicating if the
             source is valid. Defaults to None.
+            nickname: Nickname of the retriever.
+            description: Description of the retriever and what it does.
         """
         super().__init__(k=k)
         if not searxng_api_url:
@@ -670,6 +705,8 @@ class SearXNG(dspy.Retrieve):
             self.is_valid_source = is_valid_source
         else:
             self.is_valid_source = lambda x: True
+        self.nickname = nickname
+        self.description = description
 
     def get_usage_and_reset(self):
         usage = self.usage
@@ -743,6 +780,8 @@ class DuckDuckGoSearchRM(dspy.Retrieve):
             min_char_count: Minimum character count for the article to be considered valid.
             snippet_chunk_size: Maximum character count for each snippet.
             webpage_helper_max_threads: Maximum number of threads to use for webpage helper.
+            nickname: Nickname of the retriever.
+            description: Description of the retriever and what it does.
             **kwargs: Additional parameters for the OpenAI API.
         """
         super().__init__(k=k)
@@ -759,6 +798,9 @@ class DuckDuckGoSearchRM(dspy.Retrieve):
             max_thread_num=webpage_helper_max_threads,
         )
         self.usage = 0
+        self.nickname = nickname
+        self.description = description
+
         # All params for search can be found here:
         #   https://duckduckgo.com/duckduckgo-help-pages/settings/params/
 
@@ -873,6 +915,8 @@ class TavilySearchRM(dspy.Retrieve):
         snippet_chunk_size: int = 1000,
         webpage_helper_max_threads=10,
         include_raw_content=False,
+        nickname="TavilySearchRM",
+        description="Retrieve information from Tavily search.",
     ):
         """
         Params:
@@ -881,6 +925,8 @@ class TavilySearchRM(dspy.Retrieve):
             snippet_chunk_size: Maximum character count for each snippet.
             webpage_helper_max_threads: Maximum number of threads to use for webpage helper.
             include_raw_content bool: Boolean that is used to determine if the full text should be returned.
+            nickname: Nickname of the retriever.
+            description: Description of the retriever and what it does.
         """
         super().__init__(k=k)
         try:
@@ -917,6 +963,8 @@ class TavilySearchRM(dspy.Retrieve):
             self.is_valid_source = is_valid_source
         else:
             self.is_valid_source = lambda x: True
+        self.nickname = nickname
+        self.description = description
 
     def get_usage_and_reset(self):
         usage = self.usage

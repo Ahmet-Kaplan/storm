@@ -9,6 +9,8 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from typing import Dict, List, Optional, Union, TYPE_CHECKING
 
+from knowledge_storm.storm_wiki.modules.retriever import is_valid_wikipedia_source
+
 from .utils import ArticleTextProcessing
 
 logging.basicConfig(
@@ -266,10 +268,23 @@ class Retriever:
     The retrieval model/search engine used for each part should be declared with a suffix '_rm' in the attribute name.
     """
 
-    def __init__(self, rm: dspy.Retrieve, max_thread: int = 1):
+    def __init__(self, rm: Union[dspy.Retrieve, List[dspy.Retrieve]], max_thread: int = 1):
         self.max_thread = max_thread
-        self.rm = rm
+        self._rm = rm
 
+        # create a dictionary with the retrievers
+        self._rm = {self._rm[i].nickname.lower().strip() : self._rm[i] for i in range(len(self._rm))}
+        # check if there are two retrievers with the same nickname and raise an error
+        if len(self._rm.keys()) != len(set(self._rm.keys())):
+            raise ValueError("There are two retrievers with the same nickname.")
+
+        for rm_name in self._rm:
+            if hasattr(self._rm[rm_name], 'is_valid_source'):
+                self._rm[rm_name].is_valid_source = is_valid_wikipedia_source
+
+    def get_nicknames_and_descriptions(self):
+        return [(rm_name, self._rm[rm_name].description.strip()) for rm_name in self._rm]
+    
     def collect_and_reset_rm_usage(self):
         combined_usage = []
         if hasattr(getattr(self, "rm"), "get_usage_and_reset"):
@@ -286,16 +301,14 @@ class Retriever:
         return name_to_usage
 
     def retrieve(
-        self, query: Union[str, List[str]], exclude_urls: List[str] = []
+        self, queries_with_systems: List[tuple[List[str], str]], exclude_urls: List[str] = []
     ) -> List[Information]:
-        queries = query if isinstance(query, list) else [query]
+        
         to_return = []
 
-        def process_query(q):
-            retrieved_data_list = self.rm(
-                query_or_queries=[q], exclude_urls=exclude_urls
-            )
+        def process_query(retrieved_data_list,q):
             local_to_return = []
+
             for data in retrieved_data_list:
                 for i in range(len(data["snippets"])):
                     # STORM generate the article with citations. We do not consider multi-hop citations.
@@ -307,11 +320,14 @@ class Retriever:
                 storm_info.meta["query"] = q
                 local_to_return.append(storm_info)
             return local_to_return
-
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=self.max_thread
-        ) as executor:
-            results = list(executor.map(process_query, queries))
+        
+        for queries, system in queries_with_systems:
+            if system in self._rm:
+                retrieved_data_list = self._rm[system](query_or_queries=queries, exclude_urls=exclude_urls)
+                with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=self.max_thread
+                ) as executor:
+                    results = list(executor.map(process_query, retrieved_data_list,queries))
 
         for result in results:
             to_return.extend(result)
