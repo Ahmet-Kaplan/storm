@@ -9,13 +9,15 @@ import markdown
 import pytz
 import streamlit as st
 
-# If you install the source code instead of the `knowledge-storm` package,
-# Uncomment the following lines:
-# import sys
-# sys.path.append('../../')
+import sys
+
+# Get the project root directory
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(project_root)
+
 from knowledge_storm import STORMWikiRunnerArguments, STORMWikiRunner, STORMWikiLMConfigs
 from knowledge_storm.lm import OpenAIModel
-from knowledge_storm.rm import YouRM
+from knowledge_storm.rm import YouRM, BraveRM
 from knowledge_storm.storm_wiki.modules.callback import BaseCallbackHandler
 from knowledge_storm.utils import truncate_filename
 from stoc import stoc
@@ -37,15 +39,15 @@ class DemoFileIOHelper():
                 of file names and their absolute paths within that article's directory.
         """
         articles_dict = {}
-        for topic_name in os.listdir(articles_root_path):
-            topic_path = os.path.join(articles_root_path, topic_name)
+        for opportunity_name in os.listdir(articles_root_path):
+            topic_path = os.path.join(articles_root_path, opportunity_name)
             if os.path.isdir(topic_path):
                 # Initialize or update the dictionary for the topic
-                articles_dict[topic_name] = {}
+                articles_dict[opportunity_name] = {}
                 # Iterate over all files within a topic directory
                 for file_name in os.listdir(topic_path):
                     file_path = os.path.join(topic_path, file_name)
-                    articles_dict[topic_name][file_name] = os.path.abspath(file_path)
+                    articles_dict[opportunity_name][file_name] = os.path.abspath(file_path)
         return articles_dict
 
     @staticmethod
@@ -485,7 +487,10 @@ def _display_main_article(selected_article_file_path_dict, show_reference=True, 
 
 
 def get_demo_dir():
-    return os.path.dirname(os.path.abspath(__file__))
+    # return os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    # Return the data directory path
+    return os.path.join(project_root, "data")
 
 
 def clear_other_page_session_state(page_index: Optional[int]):
@@ -502,10 +507,21 @@ def set_storm_runner():
     if not os.path.exists(current_working_dir):
         os.makedirs(current_working_dir)
 
+    # Get OpenAI API key
+    openai_api_key = os.getenv('OPENAI_API_KEY')
+    if not openai_api_key:
+        try:
+            openai_api_key = st.secrets['OPENAI_API_KEY']
+        except AttributeError:
+            openai_api_key = None
+
+    if not openai_api_key:
+        raise ValueError("OpenAI API key is not set in environment variables or Streamlit secrets.")
+
     # configure STORM runner
     llm_configs = STORMWikiLMConfigs()
-    llm_configs.init_openai_model(openai_api_key=st.secrets['OPENAI_API_KEY'], openai_type='openai')
-    llm_configs.set_question_asker_lm(OpenAIModel(model='gpt-4-1106-preview', api_key=st.secrets['OPENAI_API_KEY'],
+    llm_configs.init_openai_model(openai_api_key=openai_api_key , openai_type='openai')
+    llm_configs.set_question_asker_lm(OpenAIModel(model='gpt-4-1106-preview', api_key=openai_api_key,
                                                   api_provider='openai',
                                                   max_tokens=500, temperature=1.0, top_p=0.9))
     engine_args = STORMWikiRunnerArguments(
@@ -516,7 +532,8 @@ def set_storm_runner():
         retrieve_top_k=5
     )
 
-    rm = YouRM(ydc_api_key=st.secrets['YDC_API_KEY'], k=engine_args.search_top_k)
+    # rm = YouRM(ydc_api_key=ydc_api_key, k=engine_args.search_top_k)
+    rm = BraveRM(k=engine_args.search_top_k)
 
     runner = STORMWikiRunner(engine_args, llm_configs, rm)
     st.session_state["runner"] = runner
@@ -530,7 +547,6 @@ def display_article_page(selected_article_name, selected_article_file_path_dict,
 
     if show_main_article:
         _display_main_article(selected_article_file_path_dict)
-
 
 class StreamlitCallbackHandler(BaseCallbackHandler):
     def __init__(self, status_container):
